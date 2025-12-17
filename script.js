@@ -1,14 +1,20 @@
-// Initialize map
+/* =========================
+   MAP SETUP
+========================= */
+
 const map = L.map("map").setView([40.73, -74.06], 12);
 
 // Base map
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap contributors",
-}).addTo(map);
+const baseLayer = L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    attribution: "&copy; OpenStreetMap contributors",
+  }
+).addTo(map);
 
-/* -------------------------
+/* =========================
    STYLES
--------------------------- */
+========================= */
 
 const countyStyle = {
   color: "#2563eb",
@@ -29,42 +35,46 @@ const buildingStyle = {
   fillOpacity: 0.6,
 };
 
-/* -------------------------
+/* =========================
+   LAYER GROUPS
+========================= */
+
+let countyLayer;
+let roadsLayer;
+let buildingsLayer;
+
+/* =========================
    LOAD COUNTY
--------------------------- */
+========================= */
 
 fetch("data/boundaries/hudson_county_fixed.geojson")
   .then(res => res.json())
   .then(data => {
-    const countyLayer = L.geoJSON(data, {
+    countyLayer = L.geoJSON(data, {
       style: countyStyle,
     }).addTo(map);
 
     map.fitBounds(countyLayer.getBounds());
   });
 
-/* -------------------------
+/* =========================
    LOAD ROADS
--------------------------- */
+========================= */
 
 fetch("data/infrastructure/hudsonroads.geojson")
   .then(res => res.json())
   .then(data => {
-    L.geoJSON(data, {
+    roadsLayer = L.geoJSON(data, {
       style: roadStyle,
       onEachFeature: (feature, layer) => {
 
-        // Tooltip text (safe fallback)
-        const name =
+        const roadName =
           feature.properties?.name ||
           feature.properties?.road_name ||
           "Road";
 
-        layer.bindTooltip(name, {
-          sticky: true,
-        });
+        layer.bindTooltip(roadName, { sticky: true });
 
-        // Hover highlight
         layer.on({
           mouseover: e => {
             e.target.setStyle({
@@ -73,32 +83,33 @@ fetch("data/infrastructure/hudsonroads.geojson")
             });
           },
           mouseout: e => {
-            e.target.setStyle(roadStyle);
+            roadsLayer.resetStyle(e.target);
           },
         });
       },
-    }).addTo(map);
+    });
+
+    roadsLayer.addTo(map);
+    updateLayerControl();
   });
 
-/* -------------------------
+/* =========================
    LOAD BUILDINGS
--------------------------- */
+========================= */
 
 fetch("data/infrastructure/hudsonbuildings.geojson")
   .then(res => res.json())
   .then(data => {
-    L.geoJSON(data, {
+    buildingsLayer = L.geoJSON(data, {
       style: buildingStyle,
       onEachFeature: (feature, layer) => {
 
-        const bldgName =
+        const buildingName =
           feature.properties?.name ||
           feature.properties?.building ||
           "Building";
 
-        layer.bindTooltip(bldgName, {
-          sticky: true,
-        });
+        layer.bindTooltip(buildingName, { sticky: true });
 
         layer.on({
           mouseover: e => {
@@ -108,22 +119,36 @@ fetch("data/infrastructure/hudsonbuildings.geojson")
             });
           },
           mouseout: e => {
-            e.target.setStyle(buildingStyle);
+            buildingsLayer.resetStyle(e.target);
           },
         });
       },
-    }).addTo(map);
+    });
+
+    buildingsLayer.addTo(map);
+    updateLayerControl();
   });
 
-const overlays = {};
+/* =========================
+   LAYER CONTROL
+========================= */
 
-const roadsLayer = L.geoJSON(...);
-const buildingsLayer = L.geoJSON(...);
+let layerControl;
 
-roadsLayer.addTo(map);
-buildingsLayer.addTo(map);
+function updateLayerControl() {
+  if (layerControl) {
+    map.removeControl(layerControl);
+  }
 
-L.control.layers(null, {
-  "Roads": roadsLayer,
-  "Buildings": buildingsLayer,
-}).addTo(map);
+  const overlays = {};
+
+  if (countyLayer) overlays["County Boundary"] = countyLayer;
+  if (roadsLayer) overlays["Roads"] = roadsLayer;
+  if (buildingsLayer) overlays["Buildings"] = buildingsLayer;
+
+  layerControl = L.control.layers(
+    { "OpenStreetMap": baseLayer },
+    overlays,
+    { collapsed: false }
+  ).addTo(map);
+}
