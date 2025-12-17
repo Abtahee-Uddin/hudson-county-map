@@ -4,12 +4,9 @@
 
 const map = L.map("map").setView([40.73, -74.06], 12);
 
-// Base map
 const baseLayer = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    attribution: "&copy; OpenStreetMap contributors",
-  }
+  { attribution: "&copy; OpenStreetMap contributors" }
 ).addTo(map);
 
 /* =========================
@@ -36,12 +33,33 @@ const buildingStyle = {
 };
 
 /* =========================
-   LAYER GROUPS
+   LAYERS
 ========================= */
 
-let countyLayer;
-let roadsLayer;
-let buildingsLayer;
+let countyLayer, roadsLayer, buildingsLayer;
+let layerControl;
+
+/* =========================
+   HELPER: BUILD POPUP HTML
+========================= */
+
+function buildPopupHTML(properties) {
+  let html = "<table>";
+
+  for (const key in properties) {
+    if (properties[key] !== null && properties[key] !== "") {
+      html += `
+        <tr>
+          <th style="text-align:left; padding-right:8px;">${key}</th>
+          <td>${properties[key]}</td>
+        </tr>
+      `;
+    }
+  }
+
+  html += "</table>";
+  return html;
+}
 
 /* =========================
    LOAD COUNTY
@@ -50,11 +68,9 @@ let buildingsLayer;
 fetch("data/boundaries/hudson_county_fixed.geojson")
   .then(res => res.json())
   .then(data => {
-    countyLayer = L.geoJSON(data, {
-      style: countyStyle,
-    }).addTo(map);
-
+    countyLayer = L.geoJSON(data, { style: countyStyle }).addTo(map);
     map.fitBounds(countyLayer.getBounds());
+    updateLayerControl();
   });
 
 /* =========================
@@ -68,6 +84,7 @@ fetch("data/infrastructure/hudsonroads.geojson")
       style: roadStyle,
       onEachFeature: (feature, layer) => {
 
+        // Hover tooltip (short)
         const roadName =
           feature.properties?.name ||
           feature.properties?.road_name ||
@@ -75,21 +92,23 @@ fetch("data/infrastructure/hudsonroads.geojson")
 
         layer.bindTooltip(roadName, { sticky: true });
 
+        // Click popup (FULL INFO)
+        layer.bindPopup(buildPopupHTML(feature.properties), {
+          maxWidth: 300,
+        });
+
+        // Hover highlight
         layer.on({
           mouseover: e => {
-            e.target.setStyle({
-              weight: 4,
-              color: "#ea580c",
-            });
+            e.target.setStyle({ weight: 4, color: "#ea580c" });
           },
           mouseout: e => {
             roadsLayer.resetStyle(e.target);
           },
         });
       },
-    });
+    }).addTo(map);
 
-    roadsLayer.addTo(map);
     updateLayerControl();
   });
 
@@ -104,13 +123,20 @@ fetch("data/infrastructure/hudsonbuildings.geojson")
       style: buildingStyle,
       onEachFeature: (feature, layer) => {
 
-        const buildingName =
+        const buildingLabel =
           feature.properties?.name ||
-          feature.properties?.building ||
+          feature.properties?.bldg_id ||
           "Building";
 
-        layer.bindTooltip(buildingName, { sticky: true });
+        // Hover tooltip
+        layer.bindTooltip(buildingLabel, { sticky: true });
 
+        // Click popup (FULL INFO)
+        layer.bindPopup(buildPopupHTML(feature.properties), {
+          maxWidth: 300,
+        });
+
+        // Hover highlight
         layer.on({
           mouseover: e => {
             e.target.setStyle({
@@ -123,9 +149,8 @@ fetch("data/infrastructure/hudsonbuildings.geojson")
           },
         });
       },
-    });
+    }).addTo(map);
 
-    buildingsLayer.addTo(map);
     updateLayerControl();
   });
 
@@ -133,15 +158,10 @@ fetch("data/infrastructure/hudsonbuildings.geojson")
    LAYER CONTROL
 ========================= */
 
-let layerControl;
-
 function updateLayerControl() {
-  if (layerControl) {
-    map.removeControl(layerControl);
-  }
+  if (layerControl) map.removeControl(layerControl);
 
   const overlays = {};
-
   if (countyLayer) overlays["County Boundary"] = countyLayer;
   if (roadsLayer) overlays["Roads"] = roadsLayer;
   if (buildingsLayer) overlays["Buildings"] = buildingsLayer;
