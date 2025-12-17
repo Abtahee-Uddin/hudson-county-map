@@ -114,3 +114,16 @@ fetch("data/infrastructure/hudsonbuildings.geojson")
       },
     }).addTo(map);
   });
+
+const overlays = {};
+
+const roadsLayer = L.geoJSON(...);
+const buildingsLayer = L.geoJSON(...);
+
+roadsLayer.addTo(map);
+buildingsLayer.addTo(map);
+
+L.control.layers(null, {
+  "Roads": roadsLayer,
+  "Buildings": buildingsLayer,
+}).addTo(map);
